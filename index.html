@@ -65,7 +65,6 @@
             border: 2px solid #418fde;
         }
 
-        /* 20장 카드를 위한 그리드 (모바일 4x5, 데스크톱 5x4) */
         .game-grid {
             display: grid;
             gap: 0.5rem;
@@ -110,7 +109,7 @@
             </div>
             <div class="flex flex-col gap-2">
                 <label class="text-sm font-semibold text-gray-600">학과</label>
-                <input type="text" id="input-dept" placeholder="영어과" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
+                <input type="text" id="input-dept" placeholder="경찰과" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
             </div>
             <div class="flex flex-col gap-2 mb-4">
                 <label class="text-sm font-semibold text-gray-600">학번</label>
@@ -179,15 +178,30 @@
             </button>
         </div>
 
-        <!-- 클리어 모달 -->
+        <!-- 클리어 및 역사 팝업 모달 -->
         <div id="modal-clear" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center transform scale-95 transition-transform duration-300" id="modal-clear-content">
-                <div class="text-5xl mb-4">🎉</div>
-                <h3 class="text-2xl font-bold text-gray-900 mb-2">게임 클리어!</h3>
-                <div class="bg-blue-50 text-unblue font-mono text-3xl font-bold py-4 rounded-xl mb-6 shadow-inner" id="modal-time">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4 text-center transform scale-95 transition-transform duration-300 overflow-y-auto max-h-[90vh]" id="modal-clear-content">
+                <div class="text-4xl md:text-5xl mb-2">🎉</div>
+                <h3 class="text-xl md:text-2xl font-bold text-gray-900 mb-2">게임 클리어!</h3>
+                <div class="bg-blue-50 text-unblue font-mono text-2xl md:text-3xl font-bold py-3 rounded-xl mb-4 shadow-inner" id="modal-time">
                     00:00.00
                 </div>
-                <p class="text-xs text-gray-500 mb-6">기록이 서버에 저장되었습니다.</p>
+                
+                <!-- 역사 교육 섹션 -->
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-5 text-left">
+                    <h4 id="history-nation-name" class="font-bold text-unblue text-base md:text-lg mb-2 flex items-center gap-2">
+                        💡 국가명
+                    </h4>
+                    <p id="history-background" class="text-xs md:text-sm text-gray-700 mb-3 leading-relaxed">
+                        참전 배경
+                    </p>
+                    <ul class="text-xs md:text-sm text-gray-700 space-y-2">
+                        <li><strong id="history-fig1-name" class="text-gray-900">인물1</strong>: <span id="history-fig1-desc">업적</span></li>
+                        <li><strong id="history-fig2-name" class="text-gray-900">인물2</strong>: <span id="history-fig2-desc">업적</span></li>
+                    </ul>
+                </div>
+
+                <p class="text-xs text-gray-500 mb-4">기록이 서버에 저장되었습니다.</p>
                 <button onclick="closeClearModal()" class="w-full py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md">
                     확인
                 </button>
@@ -200,13 +214,11 @@
         </div>
     </div>
 
-    <!-- Firebase SDK 및 게임 로직 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // 발급받은 Firebase 설정 적용
         const firebaseConfig = {
             apiKey: "AIzaSyCGnpMLYiob6KVCxyPzwz-URuMFbGCMx4s",
             authDomain: "un-korean-war-game.firebaseapp.com",
@@ -221,9 +233,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         
-        signInAnonymously(auth).catch((error) => {
-            console.error("인증 실패:", error);
-        });
+        signInAnonymously(auth).catch((error) => console.error("인증 실패:", error));
 
         const nations = [
             { name: '미국', flag: '🇺🇸' }, { name: '영국', flag: '🇬🇧' },
@@ -239,10 +249,36 @@
             { name: '이탈리아', flag: '🇮🇹' }, { name: '독일', flag: '🇩🇪' }
         ];
 
+        const historyData = {
+            '미국': { bg: '가장 많은 병력을 파병하여 낙동강 방어선 구축과 인천상륙작전 등 전쟁의 핵심적인 전투를 이끌었습니다.', f1: '더글러스 맥아더', d1: '유엔군 총사령관으로서 불가능에 가까웠던 인천상륙작전을 지휘하여 전세를 역전시켰습니다.', f2: '매슈 리지웨이', d2: '8군 사령관으로 부임하여 후퇴하던 유엔군의 사기를 결집시키고 반격을 주도했습니다.' },
+            '영국': { bg: '미국에 이어 두 번째로 많은 병력을 파병했으며, 설마리 전투 등에서 중공군의 대공세를 지연시키는 큰 공을 세웠습니다.', f1: '토마스 브로디', d1: '제29보병여단장으로 임진강 전투를 지휘하며 중공군의 서울 진입을 지연시켰습니다.', f2: '윌리엄 스피크먼', d2: '수류탄으로 적의 공세를 맹렬히 막아내어 최고 무공훈장인 빅토리아 십자훈장을 수훈했습니다.' },
+            '호주': { bg: '육, 해, 공군을 모두 파병한 국가로, 마량산 전투와 가평 전투 등에서 뛰어난 방어 능력을 입증했습니다.', f1: '찰스 그린', d1: '제3대대장으로 부대를 이끌며 정주 전투 등에서 승리했으나 안타깝게 전사했습니다.', f2: '론 손더스', d2: '호주 원주민 출신 장교로 가평 전투 등 주요 고지전에서 맹활약했습니다.' },
+            '네덜란드': { bg: '판 호이츠(Van Heutsz) 연대를 중심으로 파병되어 강원도 횡성 전투와 별고지 전투 등에서 치열하게 싸웠습니다.', f1: '마리누스 덴 오우덴', d1: '네덜란드 대대장으로 횡성 전투에서 중공군에 포위된 상황에서도 끝까지 부대를 지휘하다 전사했습니다.', f2: '요하네스 안토니우스 판 덜 로프', d2: '적의 맹렬한 공격 속에서도 용감히 전투를 수행하여 무공훈장을 수훈했습니다.' },
+            '캐나다': { bg: '가평 전투에서 압도적인 수의 중공군 공세를 막아내며 유엔군의 방어선을 지켜내고 서울 재함락을 막았습니다.', f1: '제임스 스톤', d1: '경보병연대(PPCLI) 2대대장으로 가평 전투에서 뛰어난 전술로 승리를 이끌었습니다.', f2: '존 로킹엄', d2: '캐나다 제25보병여단장으로 여러 굵직한 주요 방어전을 성공적으로 지휘했습니다.' },
+            '프랑스': { bg: '미군 제2보병사단에 배속되어 지평리 전투에서 백병전까지 치르며 중공군의 공세를 완벽히 분쇄했습니다.', f1: '랄프 몽클라르', d1: '대대장 직책을 맡기 위해 스스로 중장에서 중령으로 계급을 강등하여 참전한 진정한 군인입니다.', f2: '로베르 구필', d2: '프랑스 대대 부대대장으로 단장의 능선 전투에서 부하들을 이끌다 전사했습니다.' },
+            '뉴질랜드': { bg: '제16야전포병연대가 참전하여 가평 전투 등에서 보병들을 위한 핵심적인 화력 지원을 완벽히 수행했습니다.', f1: '로버트 무디', d1: '야전포병연대장으로서 쉴 새 없는 포격 지원을 지휘하여 보병들의 방어전 승리를 도왔습니다.', f2: '데니스 배빈', d2: '뉴질랜드 해군 소속으로 함상에서 주요 해상 봉쇄 및 포격 작전을 성공적으로 지원했습니다.' },
+            '필리핀': { bg: '아시아 국가 중 최초로 지상군을 파병했으며, 율동 전투에서 중공군의 포위망을 뚫고 맹활약했습니다.', f1: '피델 라모스', d1: '초급 장교로 이리 고지 전투에서 소대를 이끌고 적진을 돌파했으며, 훗날 필리핀의 대통령이 되었습니다.', f2: '콘라도 엽', d2: '율동 전투에서 고립된 부하들을 구출하기 위해 적진으로 뛰어들었다가 장렬히 전사했습니다.' },
+            '남아공': { bg: '‘날으는 치타(Flying Cheetahs)’라 불린 제2전투비행대대가 참전하여 1만 회 이상의 출격 기록을 세웠습니다.', f1: 'S. 판 브레다 테론', d1: '비행대대장으로 주요 공중 폭격 및 보급로 차단 임무를 성공적으로 지휘했습니다.', f2: 'J.F.O. 데이비스', d2: '뛰어난 조종술로 수많은 지상군 근접항공지원 임무를 완수했습니다.' },
+            '튀르키예': { bg: '군우리 전투와 금양장리 전투에서 총검을 앞세운 전설적인 백병전을 펼치며 불굴의 용맹함을 보여주었습니다.', f1: '타흐신 야즈즈', d1: '튀르키예 여단장으로 고립된 상황에서도 부대원들을 이끌고 중공군의 포위망을 돌파했습니다.', f2: '제말 도라', d2: '보병 대대장으로서 총알이 떨어지자 부하들과 함께 수류탄과 백병전으로 고지를 탈환했습니다.' },
+            '태국': { bg: '‘작은 호랑이’라는 별명으로 불리며 폭찹힐 전투 등에서 물러서지 않는 끈질긴 방어력을 보여주었습니다.', f1: '크리앙삭 차마난', d1: '소대장으로 참전하여 용감히 싸웠으며, 참전의 공로를 인정받아 훗날 태국의 총리를 역임했습니다.', f2: '끄리앙끄라이 아따난', d2: '태국군 파병 부대장으로서 수많은 고지전에서 부대원들의 사기를 이끌었습니다.' },
+            '그리스': { bg: '왕립 스파르타 대대가 참전하여 381고지 방어전 등에서 수적 열세를 극복하고 훌륭하게 진지를 사수했습니다.', f1: '디오니시오스 아르부지스', d1: '스파르타 대대장으로서 뛰어난 리더십으로 주요 방어선을 굳건히 지켰습니다.', f2: '게오르기오스 쿠마나코스', d2: '신속하고 유연한 전술로 중공군의 주요 야간 기습을 완벽하게 격퇴했습니다.' },
+            '벨기에': { bg: '룩셈부르크군과 통합 대대를 이루어 임진강 전투와 잣골 전투 등에서 끝까지 고지를 내어주지 않았습니다.', f1: '알베르 크라에', d1: '벨기에 대대장으로 임진강 전투에서 심한 부상을 입을 때까지 최전선에서 부대를 지휘했습니다.', f2: '조르주 비에르브', d2: '부상당한 크라에 대대장의 뒤를 이어 잣골 전투에서 성공적으로 방어전을 이끌었습니다.' },
+            '룩셈부르크': { bg: '인구 30만 명의 작은 나라였지만 벨기에 대대에 소대 규모로 통합 배속되어 누구보다 용맹하게 싸웠습니다.', f1: '조제프 바그너', d1: '룩셈부르크 소대장으로 배속되어 여러 고지전에서 헌신적인 리더십을 발휘했습니다.', f2: '루디 부르그', d2: '정찰 및 전초전 임무에서 여러 차례 적의 공격을 막아낸 용감한 소대원입니다.' },
+            '에티오피아': { bg: '황실 근위대인 ‘각뉴(Kagnew) 부대’가 참전해 253차례의 전투에서 단 한 명의 포로도 남기지 않은 신화를 썼습니다.', f1: '아만 안돔', d1: '대대장으로서 부대원들을 이끌며 강원도 산악 지형의 불리함을 딛고 무패 신화를 창조했습니다.', f2: '물루게타 불리', d2: '에티오피아 파병 사령관으로서 군기 확립과 부대 전술을 훌륭히 이끌었습니다.' },
+            '콜롬비아': { bg: '중남미 유일의 전투 부대 파병국으로, 올드발디 고지 전투와 금성 전투에서 용맹을 떨쳤습니다.', f1: '알베르토 루이스 노보아', d1: '콜롬비아 대대장으로서 낯선 기후와 지형 속에서도 훌륭하게 부대원들을 지휘했습니다.', f2: '하이메 폴라니아 푸요', d2: '올드발디 고지 방어전에서 중상을 입고도 끝까지 진지를 사수하여 국민적 영웅이 되었습니다.' },
+            '스웨덴': { bg: '가장 먼저 의료 지원을 결정하여 부산에 스웨덴 적십자 야전병원을 세워 수만 명의 군인과 민간인을 치료했습니다.', f1: '칼 에릭 그로트', d1: '적십자 병원장으로서 부족한 물자 속에서도 체계적인 병원 운영과 수술을 이끌었습니다.', f2: '잉그리드 욘손', d2: '전쟁의 참상 속에서도 환자들에게 따뜻한 위로와 헌신적인 의료 지원을 아끼지 않은 간호사입니다.' },
+            '인도': { bg: '제60공수야전병원대를 파견하여 최전선과 공수작전 지역까지 투입되어 부상병의 생명을 구했습니다.', f1: 'A.G. 랑가라지', d1: '병원대장으로서 직접 낙하산을 타고 작전 지역에 투입되어 부상병을 수술하는 헌신을 보여주었습니다.', f2: 'N.B. 바네르지', d2: '포탄이 떨어지는 최전방 야전 텐트 속에서도 밤낮없이 외과 수술을 집도한 군의관입니다.' },
+            '덴마크': { bg: '최첨단 의료 장비를 갖춘 병원선 ‘유틀란디아(Jutlandia)호’를 파견하여 해상 종합병원 역할을 완벽히 수행했습니다.', f1: '카이 하메리크', d1: '유틀란디아호의 원장으로 군인뿐만 아니라 한국의 민간인과 고아들까지 헌신적으로 치료했습니다.', f2: '안나 크리스텐센', d2: '병원선의 수석 간호사로서 낯선 이국땅에서 환자들의 회복을 위해 평화의 천사 역할을 했습니다.' },
+            '노르웨이': { bg: '육군 이동외과병원(NORMASH)을 설립하여 최전방인 동두천 인근에서 9만 명 이상의 환자를 치료했습니다.', f1: '베른하르드 파우스', d1: '수석 외과의사로서 하루 수십 건의 긴급 수술을 집도하며 수많은 참전용사의 생명을 구했습니다.', f2: '브리트 루네스', d2: '이동외과병원의 열악한 환경 속에서도 묵묵히 부상병들의 치료와 간호를 전담했습니다.' },
+            '이탈리아': { bg: '제68적십자야전병원을 서울 영등포에 파견하여 군인과 민간인을 가리지 않고 숭고한 의료 지원을 펼쳤습니다.', f1: '루이지 토리노', d1: '이탈리아 의료진을 이끄는 병원장으로서 화재나 전염병 등 여러 악조건 속에서도 병원을 지켰습니다.', f2: '마리아 로만', d2: '전쟁 고아들과 민간인 부상자들을 따뜻하게 품어준 헌신적인 적십자 소속 간호사입니다.' },
+            '독일': { bg: '2018년에 22번째 참전국으로 공식 인정되었으며, 종전 후 부산에 적십자 병원을 운영하며 의료 재건을 도왔습니다.', f1: '귄터 휘버', d1: '서독 의료진 파견단의 대표로서 전후 열악했던 한국의 의료 체계가 자리 잡을 수 있도록 힘썼습니다.', f2: '칼 하인츠', d2: '부산 서독병원에서 오랜 기간 헌신하며 수많은 한국 민간인 환자들을 수술하고 치료했습니다.' }
+        };
+
         let firstCard = null, secondCard = null;
         let lockBoard = false, matchedPairs = 0;
         let startTime, timerInterval, elapsedMs = 0;
         let currentUser = { name: '', dept: '', studentId: '' };
+        let currentSelectedNations = [];
         const targetPairs = 10;
 
         window.showScreen = (screenId) => {
@@ -295,12 +331,10 @@
             matchedPairs = 0;
             [firstCard, secondCard, lockBoard] = [null, null, false];
 
-            // 전체 22개국 중 랜덤 10개국 추출
             let shuffledNations = [...nations].sort(() => 0.5 - Math.random());
-            let selectedNations = shuffledNations.slice(0, targetPairs);
+            currentSelectedNations = shuffledNations.slice(0, targetPairs);
 
-            // 10개국 * 2 = 20장 카드 생성
-            let deck = [...selectedNations, ...selectedNations].sort(() => 0.5 - Math.random());
+            let deck = [...currentSelectedNations, ...currentSelectedNations].sort(() => 0.5 - Math.random());
 
             deck.forEach((nation) => {
                 const cardEl = document.createElement('div');
@@ -353,6 +387,19 @@
         async function gameComplete() {
             clearInterval(timerInterval);
             const finalTimeStr = formatTime(elapsedMs);
+            
+            // 역사 정보 렌더링
+            const randomNation = currentSelectedNations[Math.floor(Math.random() * currentSelectedNations.length)];
+            const history = historyData[randomNation.name];
+            
+            if(history) {
+                document.getElementById('history-nation-name').innerHTML = `${randomNation.flag} ${randomNation.name}의 한국전쟁 참전 이야기`;
+                document.getElementById('history-background').innerText = history.bg;
+                document.getElementById('history-fig1-name').innerText = history.f1;
+                document.getElementById('history-fig1-desc').innerText = history.d1;
+                document.getElementById('history-fig2-name').innerText = history.f2;
+                document.getElementById('history-fig2-desc').innerText = history.d2;
+            }
             
             document.getElementById('modal-time').innerText = finalTimeStr;
             const modal = document.getElementById('modal-clear');
