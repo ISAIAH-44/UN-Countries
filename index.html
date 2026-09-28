@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>한국전쟁 유엔 참전국 짝맞추기</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
@@ -12,7 +12,6 @@
                 extend: {
                     colors: {
                         unblue: '#418fde',
-                        unbluedark: '#2d6ea6',
                     },
                     fontFamily: {
                         sans: ['"Noto Sans KR"', 'sans-serif'],
@@ -22,20 +21,23 @@
         }
     </script>
     <style>
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f0f4f8; overflow-x: hidden; }
-        
-        /* 3D Flip Card Styles */
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f3f4f6; }
         .perspective { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        
         .card-inner {
             position: relative;
             width: 100%;
             height: 100%;
-            transition: transform 0.5s ease;
+            transition: transform 0.4s ease-in-out;
             transform-style: preserve-3d;
         }
+        
         .card.flipped .card-inner, .card.matched .card-inner {
             transform: rotateY(180deg);
         }
+
         .card-front, .card-back {
             position: absolute;
             width: 100%;
@@ -45,16 +47,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
+
         .card-front {
             background-color: #418fde;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>');
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>');
             background-repeat: no-repeat;
             background-position: center;
             background-size: 50%;
-            border: 2px solid #2d6ea6;
         }
+
         .card-back {
             background-color: white;
             transform: rotateY(180deg);
@@ -62,158 +65,167 @@
             border: 2px solid #418fde;
         }
 
-        /* Responsive Grid 4x5 for mobile */
+        /* 20장 카드를 위한 그리드 (모바일 4x5, 데스크톱 5x4) */
         .game-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            grid-template-rows: repeat(5, 1fr);
             gap: 0.5rem;
-            width: 100%;
-            aspect-ratio: 4/5; /* Keep it nicely shaped on mobile */
+            grid-template-columns: repeat(4, 1fr);
         }
-        
+        @media (min-width: 640px) {
+            .game-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* Disable tap highlight on mobile */
-        * { -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
-<body class="text-gray-800 min-h-screen flex justify-center">
+<body class="text-gray-800 min-h-screen flex flex-col">
 
-    <!-- Mobile Container (Max Width for native app feel) -->
-    <div id="app-container" class="w-full max-w-md bg-white min-h-screen flex flex-col relative shadow-2xl">
+    <div id="app" class="flex-grow flex flex-col items-center justify-center w-full max-w-4xl mx-auto p-4 relative">
         
-        <!-- ================= Screen 1: Home ================= -->
-        <div id="screen-home" class="flex flex-col items-center justify-center flex-grow p-6 text-center">
-            <div class="w-24 h-24 bg-unblue text-white rounded-full flex items-center justify-center mb-6 shadow-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <!-- 시작 화면 -->
+        <div id="screen-main" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center flex flex-col gap-6">
+            <div class="mb-4">
+                <div class="w-20 h-20 bg-unblue text-white rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">한국전쟁<br>유엔 참전국 짝맞추기</h1>
+                <p class="text-sm text-gray-500 mt-2">22개국 중 랜덤으로 등장하는 10개국의<br>짝을 빠르게 맞춰보세요!</p>
             </div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2 leading-tight">한국전쟁<br>유엔 참전국<br>짝맞추기</h1>
-            <p class="text-gray-500 mb-10 text-sm">22개 참전국 중 무작위 10개국의<br>짝을 가장 빨리 맞춰보세요!</p>
             
-            <div class="w-full flex flex-col gap-3">
-                <button onclick="navTo('screen-form')" class="w-full py-4 bg-unblue text-white font-bold rounded-xl text-lg shadow-md hover:bg-unbluedark transition active:scale-95">
-                    시작하기
-                </button>
-                <button onclick="showRankings()" class="w-full py-4 bg-gray-100 text-gray-800 font-bold rounded-xl text-lg shadow-sm border border-gray-200 hover:bg-gray-200 transition active:scale-95">
-                    순위 보기
-                </button>
-                <button onclick="shareGame()" class="w-full mt-4 py-3 text-unblue font-semibold text-sm rounded-xl flex items-center justify-center gap-2 active:bg-blue-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                    게임 링크 공유하기
-                </button>
-            </div>
-        </div>
-
-        <!-- ================= Screen 2: User Form ================= -->
-        <div id="screen-form" class="hidden flex-col flex-grow p-6">
-            <div class="flex items-center mb-8 pt-4">
-                <button onclick="navTo('screen-home')" class="p-2 text-gray-500 hover:text-gray-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                </button>
-                <h2 class="text-xl font-bold flex-grow text-center pr-8">참가자 정보</h2>
-            </div>
-
-            <div class="flex flex-col gap-5 flex-grow">
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">이름</label>
-                    <input type="text" id="input-name" placeholder="홍길동" class="w-full border border-gray-300 rounded-xl p-4 focus:outline-none focus:border-unblue focus:ring-2 focus:ring-blue-200 transition text-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">학과</label>
-                    <input type="text" id="input-dept" placeholder="컴퓨터공학과" class="w-full border border-gray-300 rounded-xl p-4 focus:outline-none focus:border-unblue focus:ring-2 focus:ring-blue-200 transition text-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-1">학번</label>
-                    <input type="tel" id="input-student-id" placeholder="20260001" class="w-full border border-gray-300 rounded-xl p-4 focus:outline-none focus:border-unblue focus:ring-2 focus:ring-blue-200 transition text-lg">
-                </div>
-                <p id="form-error" class="text-red-500 text-sm text-center hidden font-medium">모든 항목을 입력해주세요.</p>
-            </div>
-
-            <button onclick="handleStartGame()" class="w-full py-4 bg-unblue text-white font-bold rounded-xl text-lg shadow-md hover:bg-unbluedark transition active:scale-95 mt-4 mb-4">
+            <button onclick="showScreen('screen-user-info')" class="w-full py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md text-lg">
                 게임 시작
+            </button>
+            <button onclick="showRankingScreen()" class="w-full py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition shadow-sm text-lg">
+                순위 보기
             </button>
         </div>
 
-        <!-- ================= Screen 3: Game Board ================= -->
-        <div id="screen-game" class="hidden flex-col flex-grow p-4 bg-gray-50">
-            <!-- Header with Info and Timer -->
-            <div class="flex justify-between items-end mb-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                <div class="flex-grow">
-                    <p class="text-xs text-gray-400 font-semibold mb-1">참가자</p>
-                    <p id="game-user-info" class="font-bold text-gray-800 text-sm truncate max-w-[150px]">-</p>
+        <!-- 정보 입력 화면 -->
+        <div id="screen-user-info" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 hidden flex-col gap-4">
+            <h2 class="text-xl font-bold text-center mb-2">참가자 정보 입력</h2>
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-gray-600">이름</label>
+                <input type="text" id="input-name" placeholder="홍길동" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
+            </div>
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-gray-600">학과</label>
+                <input type="text" id="input-dept" placeholder="영어과" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
+            </div>
+            <div class="flex flex-col gap-2 mb-4">
+                <label class="text-sm font-semibold text-gray-600">학번</label>
+                <input type="text" id="input-student-id" placeholder="20260001" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
+            </div>
+            
+            <p id="form-error" class="text-red-500 text-sm text-center hidden mb-2">모든 정보를 입력해주세요.</p>
+            
+            <div class="flex gap-2">
+                <button onclick="showScreen('screen-main')" class="w-1/3 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition">
+                    뒤로
+                </button>
+                <button onclick="startGame()" class="w-2/3 py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md">
+                    시작하기
+                </button>
+            </div>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="screen-game" class="w-full h-full flex flex-col hidden pb-8 pt-4">
+            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm">
+                <div>
+                    <p class="text-xs text-gray-500">참가자</p>
+                    <p id="display-user-info" class="font-bold text-gray-800 text-sm">홍길동 (학과)</p>
                 </div>
                 <div class="text-right">
-                    <p class="text-xs text-gray-400 font-semibold mb-1">시간</p>
-                    <p id="game-timer" class="font-mono text-2xl font-bold text-unblue tracking-tighter">00.00</p>
+                    <p class="text-xs text-gray-500">플레이 타임</p>
+                    <p id="timer-display" class="font-mono text-2xl font-bold text-unblue tracking-wider">00:00.00</p>
                 </div>
             </div>
-
-            <!-- Game Grid -->
-            <div class="flex-grow flex items-center justify-center w-full">
-                <div id="game-board" class="game-grid">
-                    <!-- Cards injected here via JS -->
-                </div>
+            
+            <div id="game-board" class="game-grid w-full h-[60vh] md:h-[70vh]">
+                <!-- 카드가 여기에 생성됩니다 -->
             </div>
-
-            <!-- Footer -->
-            <div class="mt-4 flex justify-center pb-2">
-                <button onclick="navTo('screen-home')" class="text-gray-400 text-sm font-semibold underline active:text-gray-600">
+            
+            <div class="mt-6 text-center">
+                 <button onclick="quitGame()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-semibold">
                     게임 포기
                 </button>
             </div>
         </div>
 
-        <!-- ================= Screen 4: Ranking ================= -->
-        <div id="screen-ranking" class="hidden flex-col flex-grow bg-white">
-            <div class="flex items-center p-4 border-b">
-                <button onclick="navTo('screen-home')" class="p-2 text-gray-500 hover:text-gray-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                </button>
-                <h2 class="text-xl font-bold flex-grow text-center pr-8 text-unblue">명예의 전당</h2>
-            </div>
+        <!-- 순위 화면 -->
+        <div id="screen-ranking" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 md:p-8 hidden flex-col max-h-[90vh]">
+            <h2 class="text-2xl font-bold text-center mb-6 text-gray-900 flex items-center justify-center gap-2">
+                🏆 명예의 전당
+            </h2>
             
-            <div class="flex-grow overflow-y-auto no-scrollbar bg-gray-50 p-4">
-                <div id="ranking-list" class="flex flex-col gap-2">
-                    <!-- Rankings injected here -->
+            <div class="overflow-y-auto flex-grow no-scrollbar mb-6 border rounded-lg">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-700 bg-gray-100 uppercase sticky top-0 z-10">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-center w-12">순위</th>
+                            <th scope="col" class="px-4 py-3">이름/학과/학번</th>
+                            <th scope="col" class="px-4 py-3 text-right">기록</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ranking-list">
+                        <tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">데이터를 불러오는 중입니다...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="showScreen('screen-main')" class="w-full py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition">
+                메인으로 돌아가기
+            </button>
+        </div>
+
+        <!-- 클리어 모달 -->
+        <div id="modal-clear" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center transform scale-95 transition-transform duration-300" id="modal-clear-content">
+                <div class="text-5xl mb-4">🎉</div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-2">게임 클리어!</h3>
+                <div class="bg-blue-50 text-unblue font-mono text-3xl font-bold py-4 rounded-xl mb-6 shadow-inner" id="modal-time">
+                    00:00.00
                 </div>
-            </div>
-            
-            <div class="p-4 bg-white border-t">
-                <button onclick="navTo('screen-home')" class="w-full py-3 bg-unblue text-white font-bold rounded-xl shadow-md active:bg-unbluedark">
-                    처음으로
+                <p class="text-xs text-gray-500 mb-6">기록이 서버에 저장되었습니다.</p>
+                <button onclick="closeClearModal()" class="w-full py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md">
+                    확인
                 </button>
             </div>
         </div>
-
-        <!-- Custom Toast/Alert for copied link -->
-        <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-bold shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
-            링크가 복사되었습니다.
-        </div>
-
-        <!-- Loading Overlay -->
-        <div id="loading" class="absolute inset-0 bg-white/90 flex flex-col items-center justify-center z-50 hidden">
-            <div class="w-12 h-12 border-4 border-gray-200 border-t-unblue rounded-full animate-spin mb-4"></div>
-            <p class="text-gray-600 font-semibold" id="loading-text">처리중...</p>
+        
+        <!-- 로딩 오버레이 -->
+        <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50 hidden">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-unblue"></div>
         </div>
     </div>
 
+    <!-- Firebase SDK 및 게임 로직 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global State & Firebase Setup
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'korean-war-memory-22';
-        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-        
-        let db = null;
-        let auth = null;
-        let isReady = false;
+        // 발급받은 Firebase 설정 적용
+        const firebaseConfig = {
+            apiKey: "AIzaSyCGnpMLYiob6KVCxyPzwz-URuMFbGCMx4s",
+            authDomain: "un-korean-war-game.firebaseapp.com",
+            projectId: "un-korean-war-game",
+            storageBucket: "un-korean-war-game.firebasestorage.app",
+            messagingSenderId: "731032405203",
+            appId: "1:731032405203:web:7fb297459a7f9b33e34026",
+            measurementId: "G-QV9FJN08D8"
+        };
 
-        // Game State
-        const ALL_NATIONS = [
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        signInAnonymously(auth).catch((error) => {
+            console.error("인증 실패:", error);
+        });
+
+        const nations = [
             { name: '미국', flag: '🇺🇸' }, { name: '영국', flag: '🇬🇧' },
             { name: '호주', flag: '🇦🇺' }, { name: '네덜란드', flag: '🇳🇱' },
             { name: '캐나다', flag: '🇨🇦' }, { name: '프랑스', flag: '🇫🇷' },
@@ -227,89 +239,27 @@
             { name: '이탈리아', flag: '🇮🇹' }, { name: '독일', flag: '🇩🇪' }
         ];
 
-        let currentUserInfo = { name: '', dept: '', studentId: '' };
-        let timerInterval;
-        let startTime = 0;
-        let firstCard = null;
-        let secondCard = null;
-        let lockBoard = false;
-        let matchedPairs = 0;
-        const TARGET_PAIRS = 10;
+        let firstCard = null, secondCard = null;
+        let lockBoard = false, matchedPairs = 0;
+        let startTime, timerInterval, elapsedMs = 0;
+        let currentUser = { name: '', dept: '', studentId: '' };
+        const targetPairs = 10;
 
-        // Initialize Firebase
-        async function initFirebase() {
-            try {
-                const firebaseConfig = JSON.parse(firebaseConfigStr);
-                if (Object.keys(firebaseConfig).length > 0) {
-                    const app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-                    
-                    const initToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                    if (initToken) {
-                        await signInWithCustomToken(auth, initToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                    isReady = true;
-                }
-            } catch (err) {
-                console.error("Firebase Auth Error:", err);
-                isReady = false; // Will fallback to local-only mode visually
-            }
-        }
-        initFirebase();
-
-        // UI Navigation
-        window.navTo = (screenId) => {
-            clearInterval(timerInterval); // stop timer if navigating away
-            ['screen-home', 'screen-form', 'screen-game', 'screen-ranking'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-                document.getElementById(id).classList.remove('flex');
-            });
-            const el = document.getElementById(screenId);
-            el.classList.remove('hidden');
-            el.classList.add('flex');
+        window.showScreen = (screenId) => {
+            document.querySelectorAll('#app > div[id^="screen-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+            document.getElementById(screenId).classList.add('flex');
         };
 
-        window.showToast = (msg) => {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.classList.remove('opacity-0');
-            setTimeout(() => { toast.classList.add('opacity-0'); }, 2000);
-        };
-
-        window.shareGame = () => {
-            const url = window.location.href;
-            
-            // Try standard clipboard API
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(url).then(() => {
-                    window.showToast('게임 링크가 복사되었습니다!');
-                }).catch(() => fallbackCopy(url));
-            } else {
-                fallbackCopy(url);
-            }
-        };
-
-        function fallbackCopy(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.left = "-999999px";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                window.showToast('게임 링크가 복사되었습니다!');
-            } catch (err) {
-                window.showToast('링크 복사를 지원하지 않는 브라우저입니다.');
-            }
-            document.body.removeChild(textArea);
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const milliseconds = Math.floor((ms % 1000) / 10);
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(2, '0')}`;
         }
 
-        window.handleStartGame = () => {
+        window.startGame = () => {
             const name = document.getElementById('input-name').value.trim();
             const dept = document.getElementById('input-dept').value.trim();
             const sid = document.getElementById('input-student-id').value.trim();
@@ -318,216 +268,163 @@
                 document.getElementById('form-error').classList.remove('hidden');
                 return;
             }
-            document.getElementById('form-error').classList.add('hidden');
+
+            currentUser = { name, dept, studentId: sid };
+            document.getElementById('display-user-info').innerText = `${name} (${dept} / ${sid})`;
             
-            currentUserInfo = { name, dept, studentId: sid };
-            document.getElementById('game-user-info').innerText = `${name} (${dept})`;
+            initGame();
+            window.showScreen('screen-game');
             
-            setupGame();
-            window.navTo('screen-game');
+            elapsedMs = 0;
+            startTime = Date.now();
+            document.getElementById('timer-display').innerText = "00:00.00";
+            timerInterval = setInterval(() => {
+                elapsedMs = Date.now() - startTime;
+                document.getElementById('timer-display').innerText = formatTime(elapsedMs);
+            }, 33);
         };
 
-        // Game Logic
-        function formatTime(ms) {
-            const totalSeconds = ms / 1000;
-            return totalSeconds.toFixed(2) + "초";
-        }
+        window.quitGame = () => {
+            clearInterval(timerInterval);
+            window.showScreen('screen-main');
+        };
 
-        function updateTimer() {
-            const now = Date.now();
-            const elapsed = now - startTime;
-            document.getElementById('game-timer').innerText = (elapsed / 1000).toFixed(2);
-        }
-
-        function setupGame() {
+        function initGame() {
             const board = document.getElementById('game-board');
             board.innerHTML = '';
             matchedPairs = 0;
-            firstCard = null;
-            secondCard = null;
-            lockBoard = false;
+            [firstCard, secondCard, lockBoard] = [null, null, false];
 
-            // 1. Randomly select 10 countries out of 22
-            const shuffled22 = [...ALL_NATIONS].sort(() => 0.5 - Math.random());
-            const selected10 = shuffled22.slice(0, 10);
+            // 전체 22개국 중 랜덤 10개국 추출
+            let shuffledNations = [...nations].sort(() => 0.5 - Math.random());
+            let selectedNations = shuffledNations.slice(0, targetPairs);
 
-            // 2. Duplicate to 20 cards
-            let deck = [...selected10, ...selected10];
+            // 10개국 * 2 = 20장 카드 생성
+            let deck = [...selectedNations, ...selectedNations].sort(() => 0.5 - Math.random());
 
-            // 3. Shuffle the 20 cards
-            deck.sort(() => 0.5 - Math.random());
+            deck.forEach((nation) => {
+                const cardEl = document.createElement('div');
+                cardEl.classList.add('card', 'perspective', 'cursor-pointer', 'w-full', 'h-full', 'min-h-[70px]', 'md:min-h-[90px]');
+                cardEl.dataset.name = nation.name;
 
-            // 4. Render
-            deck.forEach((nation, index) => {
-                const card = document.createElement('div');
-                card.className = 'card perspective cursor-pointer';
-                card.dataset.name = nation.name;
-                
-                // Adjust text size based on name length for mobile
-                let nameSize = 'text-sm';
-                if(nation.name.length > 4) nameSize = 'text-[0.65rem]';
-                else if(nation.name.length > 3) nameSize = 'text-xs';
-
-                card.innerHTML = `
+                cardEl.innerHTML = `
                     <div class="card-inner">
                         <div class="card-front"></div>
-                        <div class="card-back rounded-lg">
-                            <span class="text-3xl mb-1">${nation.flag}</span>
-                            <span class="${nameSize} font-bold text-gray-800 text-center px-1 break-keep leading-tight">${nation.name}</span>
+                        <div class="card-back">
+                            <span class="text-4xl leading-none mb-1">${nation.flag}</span>
+                            <span class="text-xs md:text-sm font-bold text-gray-800 text-center leading-tight tracking-tighter w-full px-1 truncate">${nation.name}</span>
                         </div>
                     </div>
                 `;
-                
-                card.addEventListener('click', () => flipCard(card));
-                board.appendChild(card);
-            });
 
-            // Start Timer
-            document.getElementById('game-timer').innerText = "00.00";
-            startTime = Date.now();
-            timerInterval = setInterval(updateTimer, 50); // Refresh UI frequently
-        }
-
-        function flipCard(card) {
-            if (lockBoard) return;
-            if (card === firstCard) return;
-            if (card.classList.contains('matched')) return;
-
-            card.classList.add('flipped');
-
-            if (!firstCard) {
-                firstCard = card;
-                return;
-            }
-
-            secondCard = card;
-            checkForMatch();
-        }
-
-        function checkForMatch() {
-            const isMatch = firstCard.dataset.name === secondCard.dataset.name;
-
-            if (isMatch) {
-                firstCard.classList.add('matched');
-                secondCard.classList.add('matched');
-                resetBoardState();
-                matchedPairs++;
-                
-                if (matchedPairs === TARGET_PAIRS) {
-                    handleGameComplete();
-                }
-            } else {
-                lockBoard = true;
-                setTimeout(() => {
-                    firstCard.classList.remove('flipped');
-                    secondCard.classList.remove('flipped');
-                    resetBoardState();
-                }, 800); // Wait 0.8s before flipping back
-            }
-        }
-
-        function resetBoardState() {
-            [firstCard, secondCard, lockBoard] = [null, null, false];
-        }
-
-        async function handleGameComplete() {
-            clearInterval(timerInterval);
-            const finalMs = Date.now() - startTime;
-            const finalTimeStr = formatTime(finalMs);
-            
-            document.getElementById('game-timer').innerText = (finalMs/1000).toFixed(2);
-            showLoading("기록 저장 중...");
-
-            if (isReady && auth.currentUser) {
-                try {
-                    const rankingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rankings');
-                    await addDoc(rankingsRef, {
-                        userId: auth.currentUser.uid,
-                        name: currentUserInfo.name,
-                        department: currentUserInfo.dept,
-                        studentId: currentUserInfo.studentId,
-                        timeMs: finalMs,
-                        timeStr: finalTimeStr,
-                        timestamp: serverTimestamp()
-                    });
-                } catch (e) {
-                    console.error("Save error:", e);
-                }
-            } else {
-                console.warn("DB not ready, skipping save.");
-            }
-
-            hideLoading();
-            showRankings(); // Automatically go to rankings
-        }
-
-        window.showRankings = async () => {
-            window.navTo('screen-ranking');
-            const listEl = document.getElementById('ranking-list');
-            
-            if (!isReady || !auth.currentUser) {
-                listEl.innerHTML = `<div class="p-6 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">서버에 연결할 수 없어 랭킹을 불러올 수 없습니다.</div>`;
-                return;
-            }
-
-            listEl.innerHTML = `<div class="p-6 text-center text-gray-500">데이터를 불러오는 중...</div>`;
-            
-            try {
-                // RULE 2: Fetch all, no complex queries, sort in JS memory.
-                const rankingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rankings');
-                const querySnapshot = await getDocs(rankingsRef);
-                
-                let records = [];
-                querySnapshot.forEach((doc) => records.push(doc.data()));
-                
-                // Sort ascending by timeMs (Fastest first)
-                records.sort((a, b) => a.timeMs - b.timeMs);
-
-                if (records.length === 0) {
-                    listEl.innerHTML = `<div class="p-6 text-center text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100 font-medium">아직 등록된 기록이 없습니다.<br>첫 번째로 도전해보세요!</div>`;
-                    return;
-                }
-
-                listEl.innerHTML = '';
-                // Limit display to Top 50 to maintain performance on mobile
-                records.slice(0, 50).forEach((rec, idx) => {
-                    const item = document.createElement('div');
-                    item.className = "flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 mb-2";
+                cardEl.addEventListener('click', () => {
+                    if (lockBoard || cardEl === firstCard || cardEl.classList.contains('matched')) return;
+                    cardEl.classList.add('flipped');
                     
-                    let rankBadge = `<div class="w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-bold flex items-center justify-center text-sm">${idx + 1}</div>`;
-                    if (idx === 0) rankBadge = `<div class="w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 font-bold flex items-center justify-center text-sm">🥇</div>`;
-                    if (idx === 1) rankBadge = `<div class="w-8 h-8 rounded-full bg-gray-200 text-gray-600 font-bold flex items-center justify-center text-sm">🥈</div>`;
-                    if (idx === 2) rankBadge = `<div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 font-bold flex items-center justify-center text-sm">🥉</div>`;
-
-                    item.innerHTML = `
-                        <div class="flex items-center gap-3 w-[70%]">
-                            ${rankBadge}
-                            <div class="flex flex-col overflow-hidden w-full">
-                                <span class="font-bold text-gray-800 text-sm truncate">${rec.name}</span>
-                                <span class="text-xs text-gray-500 truncate">${rec.department} / ${rec.studentId}</span>
-                            </div>
-                        </div>
-                        <div class="font-mono font-bold text-unblue tracking-tighter shrink-0">
-                            ${(rec.timeMs / 1000).toFixed(2)}초
-                        </div>
-                    `;
-                    listEl.appendChild(item);
+                    if (!firstCard) {
+                        firstCard = cardEl;
+                        return;
+                    }
+                    
+                    secondCard = cardEl;
+                    lockBoard = true;
+                    
+                    if (firstCard.dataset.name === secondCard.dataset.name) {
+                        firstCard.classList.add('matched');
+                        secondCard.classList.add('matched');
+                        matchedPairs++;
+                        [firstCard, secondCard, lockBoard] = [null, null, false];
+                        
+                        if (matchedPairs === targetPairs) {
+                            setTimeout(gameComplete, 500);
+                        }
+                    } else {
+                        setTimeout(() => {
+                            firstCard.classList.remove('flipped');
+                            secondCard.classList.remove('flipped');
+                            [firstCard, secondCard, lockBoard] = [null, null, false];
+                        }, 800);
+                    }
                 });
+                board.appendChild(cardEl);
+            });
+        }
 
-            } catch (err) {
-                console.error("Fetch error:", err);
-                listEl.innerHTML = `<div class="p-6 text-center text-red-500 font-medium bg-red-50 rounded-xl">데이터를 불러오지 못했습니다.</div>`;
+        async function gameComplete() {
+            clearInterval(timerInterval);
+            const finalTimeStr = formatTime(elapsedMs);
+            
+            document.getElementById('modal-time').innerText = finalTimeStr;
+            const modal = document.getElementById('modal-clear');
+            const modalContent = document.getElementById('modal-clear-content');
+            
+            modal.classList.remove('hidden');
+            void modal.offsetWidth; 
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+
+            try {
+                await addDoc(collection(db, 'rankings'), {
+                    name: currentUser.name,
+                    department: currentUser.dept,
+                    studentId: currentUser.studentId,
+                    time: elapsedMs,
+                    formattedTime: finalTimeStr,
+                    timestamp: serverTimestamp()
+                });
+            } catch (e) {
+                console.error("저장 실패:", e);
             }
+        }
+
+        window.closeClearModal = () => {
+            const modal = document.getElementById('modal-clear');
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                window.showScreen('screen-main');
+            }, 300);
         };
 
-        // Utility: Loading Overlay
-        function showLoading(text) {
-            document.getElementById('loading-text').innerText = text;
-            document.getElementById('loading').classList.remove('hidden');
-        }
-        function hideLoading() {
-            document.getElementById('loading').classList.add('hidden');
-        }
+        window.showRankingScreen = async () => {
+            window.showScreen('screen-ranking');
+            const tbody = document.getElementById('ranking-list');
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            tbody.innerHTML = '';
+
+            try {
+                const querySnapshot = await getDocs(collection(db, 'rankings'));
+                let records = [];
+                querySnapshot.forEach((doc) => records.push(doc.data()));
+                records.sort((a, b) => a.time - b.time);
+
+                if (records.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">아직 등록된 기록이 없습니다.</td></tr>`;
+                } else {
+                    records.slice(0, 50).forEach((record, index) => {
+                        const tr = document.createElement('tr');
+                        tr.className = index < 3 ? 'bg-blue-50 border-b' : 'bg-white border-b';
+                        
+                        let rankDisplay = `${index + 1}`;
+                        if (index === 0) rankDisplay = '🥇 1';
+                        if (index === 1) rankDisplay = '🥈 2';
+                        if (index === 2) rankDisplay = '🥉 3';
+
+                        tr.innerHTML = `
+                            <td class="px-4 py-3 text-center font-bold text-gray-700">${rankDisplay}</td>
+                            <td class="px-4 py-3 font-medium text-gray-900">${record.name} / ${record.department} / ${record.studentId}</td>
+                            <td class="px-4 py-3 text-right font-mono text-unblue font-bold">${record.formattedTime}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (error) {
+                console.error("랭킹 불러오기 실패:", error);
+                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>`;
+            } finally {
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        };
     </script>
 </body>
 </html>
