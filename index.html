@@ -1,477 +1,619 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>한국전쟁 유엔 참전국 짝맞추기</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        unblue: '#418fde',
-                    },
-                    fontFamily: {
-                        sans: ['"Noto Sans KR"', 'sans-serif'],
-                    }
-                }
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { UN_COUNTRIES } from './data/unCountries';
+import { UNCountry, CardItem, PlayerInfo, RankingRecord } from './types';
+import { GameCard } from './components/GameCard';
+import { HistoryModal } from './components/HistoryModal';
+import { LeaderboardModal } from './components/LeaderboardModal';
+import { CountryArchiveModal } from './components/CountryArchiveModal';
+import { SingleHtmlExportModal } from './components/SingleHtmlExportModal';
+import { PlayerInfoModal } from './components/PlayerInfoModal';
+import { WorldMap } from './components/WorldMap';
+import { sound } from './utils/audio';
+import { launchConfetti } from './utils/confetti';
+import { saveRanking, formatMilliseconds } from './services/storage';
+import {
+  Trophy,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  BookOpen,
+  Globe,
+  FileCode,
+  Award,
+  Sparkles,
+  Clock,
+  Shield,
+  HeartPulse,
+  Home,
+  CheckCircle2,
+  GraduationCap
+} from 'lucide-react';
+
+export default function App() {
+  // App navigation state
+  const [view, setView] = useState<'HOME' | 'PLAYING'>('HOME');
+
+  // Modals state
+  const [isPlayerInfoOpen, setIsPlayerInfoOpen] = useState(false);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Audio mute state
+  const [isMuted, setIsMuted] = useState(sound.isMuted);
+
+  // Player info
+  const [playerInfo, setPlayerInfo] = useState<PlayerInfo | null>(null);
+
+  // Game Engine State
+  const [cards, setCards] = useState<CardItem[]>([]);
+  const [playedCountries, setPlayedCountries] = useState<UNCountry[]>([]);
+  const [flippedIndexes, setFlippedIndexes] = useState<number[]>([]);
+  const [matchedPairsCount, setMatchedPairsCount] = useState<number>(0);
+  const [moves, setMoves] = useState<number>(0);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+
+  // Timer state
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const timerRef = useRef<number | null>(null);
+
+  // Result state
+  const [completedRecord, setCompletedRecord] = useState<RankingRecord | null>(null);
+  const [randomEducationalCountry, setRandomEducationalCountry] = useState<UNCountry | null>(null);
+
+  // Selected country on map
+  const [selectedMapCountry, setSelectedMapCountry] = useState<UNCountry | null>(null);
+
+  // Audio toggle
+  const toggleSound = () => {
+    const next = sound.toggleMute();
+    setIsMuted(next);
+  };
+
+  // Timer loop with millisecond precision
+  useEffect(() => {
+    if (view === 'PLAYING' && startTime !== null && matchedPairsCount < 10) {
+      const interval = window.setInterval(() => {
+        setElapsedMs(Date.now() - startTime);
+      }, 33); // ~30 fps updates for smooth millisecond display
+      timerRef.current = interval;
+      return () => clearInterval(interval);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+  }, [view, startTime, matchedPairsCount]);
+
+  // Start new game setup
+  const initGame = useCallback((info: PlayerInfo) => {
+    setPlayerInfo(info);
+
+    // 1. Pick 10 random countries from 22 countries
+    const shuffledPool = [...UN_COUNTRIES].sort(() => 0.5 - Math.random());
+    const round10 = shuffledPool.slice(0, 10);
+    setPlayedCountries(round10);
+
+    // 2. Duplicate each to create 20 cards
+    const deck: CardItem[] = [];
+    round10.forEach((country) => {
+      deck.push({
+        instanceId: `${country.id}-a`,
+        countryId: country.id,
+        country,
+        isFlipped: false,
+        isMatched: false,
+      });
+      deck.push({
+        instanceId: `${country.id}-b`,
+        countryId: country.id,
+        country,
+        isFlipped: false,
+        isMatched: false,
+      });
+    });
+
+    // 3. Shuffle the 20 cards
+    const shuffledDeck = deck.sort(() => 0.5 - Math.random());
+    setCards(shuffledDeck);
+    setFlippedIndexes([]);
+    setMatchedPairsCount(0);
+    setMoves(0);
+    setIsLocked(false);
+    setCompletedRecord(null);
+    setRandomEducationalCountry(null);
+    setIsHistoryOpen(false);
+
+    // 4. Start timer
+    const now = Date.now();
+    setStartTime(now);
+    setElapsedMs(0);
+
+    setView('PLAYING');
+  }, []);
+
+  // Handle Card Click
+  const handleCardClick = (index: number) => {
+    if (isLocked) return;
+    if (cards[index].isFlipped || cards[index].isMatched) return;
+
+    sound.playCardFlip();
+
+    // Flip this card
+    const nextCards = [...cards];
+    nextCards[index] = { ...nextCards[index], isFlipped: true };
+    setCards(nextCards);
+
+    const nextFlipped = [...flippedIndexes, index];
+    setFlippedIndexes(nextFlipped);
+
+    if (nextFlipped.length === 2) {
+      setMoves((m) => m + 1);
+      const [firstIdx, secondIdx] = nextFlipped;
+      const firstCard = nextCards[firstIdx];
+      const secondCard = nextCards[secondIdx];
+
+      if (firstCard.countryId === secondCard.countryId) {
+        // MATCH!
+        sound.playMatchSound();
+        setIsLocked(true);
+        setTimeout(() => {
+          setCards((prev) =>
+            prev.map((c, i) =>
+              i === firstIdx || i === secondIdx ? { ...c, isMatched: true } : c
+            )
+          );
+          setFlippedIndexes([]);
+          setIsLocked(false);
+
+          setMatchedPairsCount((curr) => {
+            const nextCount = curr + 1;
+            if (nextCount === 10) {
+              handleGameVictory();
             }
-        }
-    </script>
-    <style>
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f3f4f6; }
-        .perspective { perspective: 1000px; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .backface-hidden { backface-visibility: hidden; }
-        
-        .card-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            transition: transform 0.4s ease-in-out;
-            transform-style: preserve-3d;
-        }
-        
-        .card.flipped .card-inner, .card.matched .card-inner {
-            transform: rotateY(180deg);
-        }
+            return nextCount;
+          });
+        }, 350);
+      } else {
+        // MISMATCH!
+        sound.playMismatchSound();
+        setIsLocked(true);
+        setTimeout(() => {
+          setCards((prev) =>
+            prev.map((c, i) =>
+              i === firstIdx || i === secondIdx ? { ...c, isFlipped: false } : c
+            )
+          );
+          setFlippedIndexes([]);
+          setIsLocked(false);
+        }, 850);
+      }
+    }
+  };
 
-        .card-front, .card-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            backface-visibility: hidden;
-            border-radius: 0.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
+  // Victory Handler
+  const handleGameVictory = async () => {
+    const finalElapsed = startTime ? Date.now() - startTime : elapsedMs;
+    setElapsedMs(finalElapsed);
 
-        .card-front {
-            background-color: #418fde;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>');
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: 50%;
-        }
+    sound.playVictoryFanfare();
+    launchConfetti();
 
-        .card-back {
-            background-color: white;
-            transform: rotateY(180deg);
-            flex-direction: column;
-            border: 2px solid #418fde;
-        }
+    // Pick 1 random country out of the 10 played countries for educational popup
+    const randomPick =
+      playedCountries[Math.floor(Math.random() * playedCountries.length)] || playedCountries[0];
+    setRandomEducationalCountry(randomPick);
 
-        .game-grid {
-            display: grid;
-            gap: 0.5rem;
-            grid-template-columns: repeat(4, 1fr);
-        }
-        @media (min-width: 640px) {
-            .game-grid { grid-template-columns: repeat(5, 1fr); }
-        }
+    // Save record
+    if (playerInfo) {
+      const record = await saveRanking(
+        playerInfo.name,
+        playerInfo.department,
+        playerInfo.studentId,
+        finalElapsed,
+        moves + 1
+      );
+      setCompletedRecord(record);
+    }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
-</head>
-<body class="text-gray-800 min-h-screen flex flex-col">
+    // Delay modal open slightly to enjoy celebration
+    setTimeout(() => {
+      setIsHistoryOpen(true);
+    }, 700);
+  };
 
-    <div id="app" class="flex-grow flex flex-col items-center justify-center w-full max-w-4xl mx-auto p-4 relative">
-        
-        <!-- 시작 화면 -->
-        <div id="screen-main" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center flex flex-col gap-6">
-            <div class="mb-4">
-                <div class="w-20 h-20 bg-unblue text-white rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+  // Restart current round with new random 10 countries
+  const handleRestart = () => {
+    if (playerInfo) {
+      initGame(playerInfo);
+    } else {
+      setIsPlayerInfoOpen(true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
+      {/* Top Global Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3 sm:px-6 py-2.5 flex items-center justify-between">
+        <div
+          onClick={() => {
+            sound.playClick();
+            setView('HOME');
+          }}
+          className="flex items-center gap-2.5 cursor-pointer group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-blue-500 flex items-center justify-center text-lg shadow-md group-hover:scale-105 transition-transform">
+            🌐
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-sky-400 tracking-wider uppercase">
+                삼일공업고등학교
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-950 border border-sky-800 text-sky-300">
+                글로벌 아카데미
+              </span>
+            </div>
+            <h1 className="text-xs sm:text-sm font-black text-white leading-tight">
+              한국전쟁 유엔 참전국 기억하기
+            </h1>
+          </div>
+        </div>
+
+        {/* Action Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {view === 'PLAYING' && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                setView('HOME');
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
+            >
+              <Home className="w-3.5 h-3.5 text-sky-400" />
+              <span className="hidden sm:inline">홈으로</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setIsLeaderboardOpen(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1 border border-amber-500/40 transition-colors"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">순위</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setIsArchiveOpen(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-xs font-bold flex items-center gap-1 border border-sky-500/40 transition-colors"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline">22개국 도감</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setIsExportOpen(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
+            title="단일 index.html 파일 내보내기"
+          >
+            <FileCode className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden md:inline">단일 HTML</span>
+          </button>
+
+          <button
+            onClick={toggleSound}
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            title={isMuted ? '음소거 해제' : '음소거'}
+            aria-label="소리 토글"
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-rose-400" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-emerald-400" />
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-6 flex flex-col">
+        {view === 'HOME' ? (
+          /* HOME VIEW */
+          <div className="space-y-6 sm:space-y-8 my-auto py-4">
+            {/* Hero Banner */}
+            <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-sky-950/60 to-slate-900 border-2 border-sky-500/40 p-6 sm:p-10 shadow-2xl overflow-hidden text-center">
+              <div className="absolute -top-12 -left-12 w-48 h-48 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 max-w-2xl mx-auto space-y-4">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-900/80 border border-sky-400/50 text-sky-200 text-xs sm:text-sm font-black shadow-lg">
+                  <GraduationCap className="w-4 h-4 text-amber-400" /> 삼일공업고등학교 글로벌 아카데미
                 </div>
-                <h1 class="text-2xl font-bold text-gray-900">한국전쟁<br>유엔 참전국 짝맞추기</h1>
-                <p class="text-sm text-gray-500 mt-2">22개국 중 랜덤으로 등장하는 10개국의<br>짝을 빠르게 맞춰보세요!</p>
-            </div>
-            
-            <button onclick="showScreen('screen-user-info')" class="w-full py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md text-lg">
-                게임 시작
-            </button>
-            <button onclick="showRankingScreen()" class="w-full py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition shadow-sm text-lg">
-                순위 보기
-            </button>
-        </div>
 
-        <!-- 정보 입력 화면 -->
-        <div id="screen-user-info" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 hidden flex-col gap-4">
-            <h2 class="text-xl font-bold text-center mb-2">참가자 정보 입력</h2>
-            <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-gray-600">이름</label>
-                <input type="text" id="input-name" placeholder="홍길동" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
-            </div>
-            <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-gray-600">학과</label>
-                <input type="text" id="input-dept" placeholder="경찰과" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
-            </div>
-            <div class="flex flex-col gap-2 mb-4">
-                <label class="text-sm font-semibold text-gray-600">학번</label>
-                <input type="text" id="input-student-id" placeholder="20260001" class="border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-unblue focus:ring-1 focus:ring-unblue">
-            </div>
-            
-            <p id="form-error" class="text-red-500 text-sm text-center hidden mb-2">모든 정보를 입력해주세요.</p>
-            
-            <div class="flex gap-2">
-                <button onclick="showScreen('screen-main')" class="w-1/3 py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition">
-                    뒤로
-                </button>
-                <button onclick="startGame()" class="w-2/3 py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md">
-                    시작하기
-                </button>
-            </div>
-        </div>
+                <h2 className="text-2xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+                  한국전쟁 유엔 참전국 <br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-300 to-amber-300">
+                    기억하기 챌린지
+                  </span>
+                </h2>
 
-        <!-- 게임 화면 -->
-        <div id="screen-game" class="w-full h-full flex flex-col hidden pb-8 pt-4">
-            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm">
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl mx-auto">
+                  1950년 대한민국의 자유와 평화를 지키기 위해 바다를 건너온 UN 22개국의 숭고한 희생을 기립니다.
+                  매 게임마다 무작위로 추출되는 10개국의 국기 카드를 매칭하고, 네덜란드 판 호이츠 연대와 필리핀 원정군 등 역사적 영웅들을 만나보세요.
+                </p>
+
+                {/* Primary CTA Buttons */}
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setIsPlayerInfoOpen(true);
+                    }}
+                    className="px-6 sm:px-8 py-3.5 rounded-2xl bg-gradient-to-r from-[#418fde] via-blue-600 to-[#1c559c] hover:from-sky-400 hover:to-blue-500 text-white font-black text-sm sm:text-base flex items-center gap-2.5 shadow-xl shadow-sky-600/40 hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <Play className="w-5 h-5 fill-current" />
+                    <span>게임 시작하기 (도전 등록)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setIsLeaderboardOpen(true);
+                    }}
+                    className="px-5 py-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 font-bold text-sm sm:text-base flex items-center gap-2 transition-all hover:scale-105"
+                  >
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                    <span>명예의 전당 (순위)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow">
+                <Shield className="w-5 h-5 text-sky-400 mx-auto mb-1" />
+                <div className="text-xl sm:text-2xl font-black text-white">16개국</div>
+                <div className="text-[11px] text-slate-400">전투지원 파병국</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow">
+                <HeartPulse className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
+                <div className="text-xl sm:text-2xl font-black text-white">6개국</div>
+                <div className="text-[11px] text-slate-400">의료지원 파병국</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow">
+                <Sparkles className="w-5 h-5 text-amber-400 mx-auto mb-1" />
+                <div className="text-xl sm:text-2xl font-black text-white">1,957,733명</div>
+                <div className="text-[11px] text-slate-400">유엔군 참전 연인원</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow">
+                <Award className="w-5 h-5 text-purple-400 mx-auto mb-1" />
+                <div className="text-xl sm:text-2xl font-black text-white">100% 모바일</div>
+                <div className="text-[11px] text-slate-400">밀리초 랭킹 & 역사팝업</div>
+              </div>
+            </div>
+
+            {/* Featured Focus: Samil Tech High School Special Study Countries */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  삼일공고 글로벌 아카데미 집중 탐구 국가 (네덜란드 & 필리핀)
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Netherlands Card */}
+                <div className="bg-slate-950/70 p-4 rounded-2xl border border-sky-500/30 hover:border-sky-500/60 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xl">🇳🇱</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-bold">
+                      전투지원
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white mt-2">
+                    네덜란드 (Netherlands)
+                  </h4>
+                  <p className="text-xs text-sky-300 font-semibold mt-0.5">
+                    판 호이츠 연대 • 횡성 전투 • 원주 전투
+                  </p>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                    대대장 덴 아우덴 중령이 횡성에서 장렬히 산화하며 미 제2사단의 철수로를 사수했습니다.
+                  </p>
+                </div>
+
+                {/* Philippines Card */}
+                <div className="bg-slate-950/70 p-4 rounded-2xl border border-amber-500/30 hover:border-amber-500/60 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xl">🇵🇭</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                      전투지원
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-white mt-2">
+                    필리핀 (Philippines)
+                  </h4>
+                  <p className="text-xs text-amber-300 font-semibold mt-0.5">
+                    필리핀 원정군(PEFTOK) • 율동 전투 • 이리고지 전투
+                  </p>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                    아시아 최초 지상군 파병국으로 율동 전투에서 얍 대위와 장병들이 대공세를 물리쳤습니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive World Map Section on Home */}
+            <div className="pt-2">
+              <WorldMap
+                highlightedCountries={UN_COUNTRIES.slice(0, 10)}
+                onSelectCountry={(c) => setSelectedMapCountry(c)}
+                title="UN 22개 참전국 글로벌 지원 인터랙티브 지도"
+              />
+            </div>
+          </div>
+        ) : (
+          /* PLAYING VIEW */
+          <div className="flex-1 flex flex-col space-y-3 sm:space-y-4 max-w-4xl mx-auto w-full">
+            {/* Game Top HUD */}
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-wrap items-center justify-between gap-3 shrink-0">
+              {/* Player Badge */}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-sky-600/30 border border-sky-500/40 flex items-center justify-center text-sm font-bold text-sky-300">
+                  {playerInfo?.name?.[0] || '도'}
+                </div>
                 <div>
-                    <p class="text-xs text-gray-500">참가자</p>
-                    <p id="display-user-info" class="font-bold text-gray-800 text-sm">홍길동 (학과)</p>
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    {playerInfo?.name}
+                    <span className="text-[10px] font-normal text-sky-400">
+                      ({playerInfo?.department})
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    학번: {playerInfo?.studentId}
+                  </div>
                 </div>
-                <div class="text-right">
-                    <p class="text-xs text-gray-500">플레이 타임</p>
-                    <p id="timer-display" class="font-mono text-2xl font-bold text-unblue tracking-wider">00:00.00</p>
+              </div>
+
+              {/* Real-time Timer (Millisecond accuracy) */}
+              <div className="flex items-center gap-2 bg-slate-950 px-3.5 py-1.5 rounded-xl border border-slate-800">
+                <Clock className="w-4 h-4 text-sky-400 animate-pulse" />
+                <div className="font-mono text-base sm:text-lg font-black text-amber-300">
+                  {formatMilliseconds(elapsedMs)}
                 </div>
-            </div>
-            
-            <div id="game-board" class="game-grid w-full h-[60vh] md:h-[70vh]">
-                <!-- 카드가 여기에 생성됩니다 -->
-            </div>
-            
-            <div class="mt-6 text-center">
-                 <button onclick="quitGame()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-semibold">
-                    게임 포기
+              </div>
+
+              {/* Stats & Progress */}
+              <div className="flex items-center gap-3 text-xs">
+                <div className="text-slate-300">
+                  시도: <span className="font-bold text-white font-mono">{moves}회</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">완료:</span>
+                  <span className="font-bold text-sky-400 font-mono">
+                    {matchedPairsCount} / 10
+                  </span>
+                </div>
+              </div>
+
+              {/* Game Control Buttons */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleRestart}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition-colors"
+                  title="새로운 10개국으로 재도전"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="hidden sm:inline">재도전</span>
                 </button>
-            </div>
-        </div>
-
-        <!-- 순위 화면 -->
-        <div id="screen-ranking" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 md:p-8 hidden flex-col max-h-[90vh]">
-            <h2 class="text-2xl font-bold text-center mb-6 text-gray-900 flex items-center justify-center gap-2">
-                🏆 명예의 전당
-            </h2>
-            
-            <div class="overflow-y-auto flex-grow no-scrollbar mb-6 border rounded-lg">
-                <table class="w-full text-sm text-left">
-                    <thead class="text-xs text-gray-700 bg-gray-100 uppercase sticky top-0 z-10">
-                        <tr>
-                            <th scope="col" class="px-4 py-3 text-center w-12">순위</th>
-                            <th scope="col" class="px-4 py-3">이름/학과/학번</th>
-                            <th scope="col" class="px-4 py-3 text-right">기록</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ranking-list">
-                        <tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">데이터를 불러오는 중입니다...</td></tr>
-                    </tbody>
-                </table>
+              </div>
             </div>
 
-            <button onclick="showScreen('screen-main')" class="w-full py-3 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition">
-                메인으로 돌아가기
-            </button>
-        </div>
-
-        <!-- 클리어 및 역사 팝업 모달 -->
-        <div id="modal-clear" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-            <div class="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-md w-full mx-4 text-center transform scale-95 transition-transform duration-300 overflow-y-auto max-h-[90vh]" id="modal-clear-content">
-                <div class="text-4xl md:text-5xl mb-2">🎉</div>
-                <h3 class="text-xl md:text-2xl font-bold text-gray-900 mb-2">게임 클리어!</h3>
-                <div class="bg-blue-50 text-unblue font-mono text-2xl md:text-3xl font-bold py-3 rounded-xl mb-4 shadow-inner" id="modal-time">
-                    00:00.00
-                </div>
-                
-                <!-- 역사 교육 섹션 -->
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-5 text-left">
-                    <h4 id="history-nation-name" class="font-bold text-unblue text-base md:text-lg mb-2 flex items-center gap-2">
-                        💡 국가명
-                    </h4>
-                    <p id="history-background" class="text-xs md:text-sm text-gray-700 mb-3 leading-relaxed">
-                        참전 배경
-                    </p>
-                    <ul class="text-xs md:text-sm text-gray-700 space-y-2">
-                        <li><strong id="history-fig1-name" class="text-gray-900">인물1</strong>: <span id="history-fig1-desc">업적</span></li>
-                        <li><strong id="history-fig2-name" class="text-gray-900">인물2</strong>: <span id="history-fig2-desc">업적</span></li>
-                    </ul>
-                </div>
-
-                <p class="text-xs text-gray-500 mb-4">기록이 서버에 저장되었습니다.</p>
-                <button onclick="closeClearModal()" class="w-full py-3 bg-unblue text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-md">
-                    확인
-                </button>
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className="bg-gradient-to-r from-sky-500 to-amber-400 h-full transition-all duration-300 ease-out"
+                style={{ width: `${(matchedPairsCount / 10) * 100}%` }}
+              />
             </div>
-        </div>
-        
-        <!-- 로딩 오버레이 -->
-        <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-80 flex items-center justify-center z-50 hidden">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-unblue"></div>
-        </div>
+
+            {/* Mobile-Optimized Responsive Card Grid (20 Cards) */}
+            <div className="flex-1 flex items-center justify-center py-1">
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 sm:gap-3 w-full max-w-3xl">
+                {cards.map((card, idx) => (
+                  <GameCard
+                    key={card.instanceId}
+                    card={card}
+                    disabled={isLocked}
+                    onClick={() => handleCardClick(idx)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* In-game Interactive World Map showing current 10 highlighted nations */}
+            <div className="pt-2">
+              <WorldMap
+                highlightedCountries={playedCountries}
+                title="현재 매칭 중인 10개국 글로벌 위치"
+              />
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-auto border-t border-slate-800/80 bg-slate-950/80 px-4 py-3 text-center text-xs text-slate-500">
+        <p>
+          삼일공업고등학교 글로벌 아카데미 역사 교육 프로젝트 | 대한민국을 위해 헌신한 22개국 유엔 참전 용사들을 영원히 잊지 않겠습니다.
+        </p>
+      </footer>
+
+      {/* MODALS */}
+      {/* 1. Player Info Form Modal */}
+      {isPlayerInfoOpen && (
+        <PlayerInfoModal
+          onStartGame={(info) => {
+            setIsPlayerInfoOpen(false);
+            initGame(info);
+          }}
+          onCancel={() => setIsPlayerInfoOpen(false)}
+        />
+      )}
+
+      {/* 2. Educational History Popup Modal (When cleared) */}
+      {isHistoryOpen && completedRecord && randomEducationalCountry && (
+        <HistoryModal
+          record={completedRecord}
+          playedCountries={playedCountries}
+          initialCountry={randomEducationalCountry}
+          onClose={() => setIsHistoryOpen(false)}
+          onRestart={handleRestart}
+          onOpenLeaderboard={() => {
+            setIsHistoryOpen(false);
+            setIsLeaderboardOpen(true);
+          }}
+          onOpenMap={() => {
+            setIsHistoryOpen(false);
+            // Stay in page or view map
+          }}
+        />
+      )}
+
+      {/* 3. Leaderboard Modal */}
+      {isLeaderboardOpen && (
+        <LeaderboardModal
+          onClose={() => setIsLeaderboardOpen(false)}
+          currentRecordId={completedRecord?.id}
+        />
+      )}
+
+      {/* 4. UN Countries 22 Encyclopedia Modal */}
+      {isArchiveOpen && (
+        <CountryArchiveModal
+          onClose={() => setIsArchiveOpen(false)}
+          onSelectForMap={(c) => {
+            setSelectedMapCountry(c);
+            setIsArchiveOpen(false);
+          }}
+        />
+      )}
+
+      {/* 5. Single HTML Code Export Modal */}
+      {isExportOpen && (
+        <SingleHtmlExportModal onClose={() => setIsExportOpen(false)} />
+      )}
     </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCGnpMLYiob6KVCxyPzwz-URuMFbGCMx4s",
-            authDomain: "un-korean-war-game.firebaseapp.com",
-            projectId: "un-korean-war-game",
-            storageBucket: "un-korean-war-game.firebasestorage.app",
-            messagingSenderId: "731032405203",
-            appId: "1:731032405203:web:7fb297459a7f9b33e34026",
-            measurementId: "G-QV9FJN08D8"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        
-        signInAnonymously(auth).catch((error) => console.error("인증 실패:", error));
-
-        const nations = [
-            { name: '미국', flag: '🇺🇸' }, { name: '영국', flag: '🇬🇧' },
-            { name: '호주', flag: '🇦🇺' }, { name: '네덜란드', flag: '🇳🇱' },
-            { name: '캐나다', flag: '🇨🇦' }, { name: '프랑스', flag: '🇫🇷' },
-            { name: '뉴질랜드', flag: '🇳🇿' }, { name: '필리핀', flag: '🇵🇭' },
-            { name: '남아공', flag: '🇿🇦' }, { name: '튀르키예', flag: '🇹🇷' },
-            { name: '태국', flag: '🇹🇭' }, { name: '그리스', flag: '🇬🇷' },
-            { name: '벨기에', flag: '🇧🇪' }, { name: '룩셈부르크', flag: '🇱🇺' },
-            { name: '에티오피아', flag: '🇪🇹' }, { name: '콜롬비아', flag: '🇨🇴' },
-            { name: '스웨덴', flag: '🇸🇪' }, { name: '인도', flag: '🇮🇳' },
-            { name: '덴마크', flag: '🇩🇰' }, { name: '노르웨이', flag: '🇳🇴' },
-            { name: '이탈리아', flag: '🇮🇹' }, { name: '독일', flag: '🇩🇪' }
-        ];
-
-        const historyData = {
-            '미국': { bg: '가장 많은 병력을 파병하여 낙동강 방어선 구축과 인천상륙작전 등 전쟁의 핵심적인 전투를 이끌었습니다.', f1: '더글러스 맥아더', d1: '유엔군 총사령관으로서 불가능에 가까웠던 인천상륙작전을 지휘하여 전세를 역전시켰습니다.', f2: '매슈 리지웨이', d2: '8군 사령관으로 부임하여 후퇴하던 유엔군의 사기를 결집시키고 반격을 주도했습니다.' },
-            '영국': { bg: '미국에 이어 두 번째로 많은 병력을 파병했으며, 설마리 전투 등에서 중공군의 대공세를 지연시키는 큰 공을 세웠습니다.', f1: '토마스 브로디', d1: '제29보병여단장으로 임진강 전투를 지휘하며 중공군의 서울 진입을 지연시켰습니다.', f2: '윌리엄 스피크먼', d2: '수류탄으로 적의 공세를 맹렬히 막아내어 최고 무공훈장인 빅토리아 십자훈장을 수훈했습니다.' },
-            '호주': { bg: '육, 해, 공군을 모두 파병한 국가로, 마량산 전투와 가평 전투 등에서 뛰어난 방어 능력을 입증했습니다.', f1: '찰스 그린', d1: '제3대대장으로 부대를 이끌며 정주 전투 등에서 승리했으나 안타깝게 전사했습니다.', f2: '론 손더스', d2: '호주 원주민 출신 장교로 가평 전투 등 주요 고지전에서 맹활약했습니다.' },
-            '네덜란드': { bg: '판 호이츠(Van Heutsz) 연대를 중심으로 파병되어 강원도 횡성 전투와 별고지 전투 등에서 치열하게 싸웠습니다.', f1: '마리누스 덴 오우덴', d1: '네덜란드 대대장으로 횡성 전투에서 중공군에 포위된 상황에서도 끝까지 부대를 지휘하다 전사했습니다.', f2: '요하네스 안토니우스 판 덜 로프', d2: '적의 맹렬한 공격 속에서도 용감히 전투를 수행하여 무공훈장을 수훈했습니다.' },
-            '캐나다': { bg: '가평 전투에서 압도적인 수의 중공군 공세를 막아내며 유엔군의 방어선을 지켜내고 서울 재함락을 막았습니다.', f1: '제임스 스톤', d1: '경보병연대(PPCLI) 2대대장으로 가평 전투에서 뛰어난 전술로 승리를 이끌었습니다.', f2: '존 로킹엄', d2: '캐나다 제25보병여단장으로 여러 굵직한 주요 방어전을 성공적으로 지휘했습니다.' },
-            '프랑스': { bg: '미군 제2보병사단에 배속되어 지평리 전투에서 백병전까지 치르며 중공군의 공세를 완벽히 분쇄했습니다.', f1: '랄프 몽클라르', d1: '대대장 직책을 맡기 위해 스스로 중장에서 중령으로 계급을 강등하여 참전한 진정한 군인입니다.', f2: '로베르 구필', d2: '프랑스 대대 부대대장으로 단장의 능선 전투에서 부하들을 이끌다 전사했습니다.' },
-            '뉴질랜드': { bg: '제16야전포병연대가 참전하여 가평 전투 등에서 보병들을 위한 핵심적인 화력 지원을 완벽히 수행했습니다.', f1: '로버트 무디', d1: '야전포병연대장으로서 쉴 새 없는 포격 지원을 지휘하여 보병들의 방어전 승리를 도왔습니다.', f2: '데니스 배빈', d2: '뉴질랜드 해군 소속으로 함상에서 주요 해상 봉쇄 및 포격 작전을 성공적으로 지원했습니다.' },
-            '필리핀': { bg: '아시아 국가 중 최초로 지상군을 파병했으며, 율동 전투에서 중공군의 포위망을 뚫고 맹활약했습니다.', f1: '피델 라모스', d1: '초급 장교로 이리 고지 전투에서 소대를 이끌고 적진을 돌파했으며, 훗날 필리핀의 대통령이 되었습니다.', f2: '콘라도 엽', d2: '율동 전투에서 고립된 부하들을 구출하기 위해 적진으로 뛰어들었다가 장렬히 전사했습니다.' },
-            '남아공': { bg: '‘날으는 치타(Flying Cheetahs)’라 불린 제2전투비행대대가 참전하여 1만 회 이상의 출격 기록을 세웠습니다.', f1: 'S. 판 브레다 테론', d1: '비행대대장으로 주요 공중 폭격 및 보급로 차단 임무를 성공적으로 지휘했습니다.', f2: 'J.F.O. 데이비스', d2: '뛰어난 조종술로 수많은 지상군 근접항공지원 임무를 완수했습니다.' },
-            '튀르키예': { bg: '군우리 전투와 금양장리 전투에서 총검을 앞세운 전설적인 백병전을 펼치며 불굴의 용맹함을 보여주었습니다.', f1: '타흐신 야즈즈', d1: '튀르키예 여단장으로 고립된 상황에서도 부대원들을 이끌고 중공군의 포위망을 돌파했습니다.', f2: '제말 도라', d2: '보병 대대장으로서 총알이 떨어지자 부하들과 함께 수류탄과 백병전으로 고지를 탈환했습니다.' },
-            '태국': { bg: '‘작은 호랑이’라는 별명으로 불리며 폭찹힐 전투 등에서 물러서지 않는 끈질긴 방어력을 보여주었습니다.', f1: '크리앙삭 차마난', d1: '소대장으로 참전하여 용감히 싸웠으며, 참전의 공로를 인정받아 훗날 태국의 총리를 역임했습니다.', f2: '끄리앙끄라이 아따난', d2: '태국군 파병 부대장으로서 수많은 고지전에서 부대원들의 사기를 이끌었습니다.' },
-            '그리스': { bg: '왕립 스파르타 대대가 참전하여 381고지 방어전 등에서 수적 열세를 극복하고 훌륭하게 진지를 사수했습니다.', f1: '디오니시오스 아르부지스', d1: '스파르타 대대장으로서 뛰어난 리더십으로 주요 방어선을 굳건히 지켰습니다.', f2: '게오르기오스 쿠마나코스', d2: '신속하고 유연한 전술로 중공군의 주요 야간 기습을 완벽하게 격퇴했습니다.' },
-            '벨기에': { bg: '룩셈부르크군과 통합 대대를 이루어 임진강 전투와 잣골 전투 등에서 끝까지 고지를 내어주지 않았습니다.', f1: '알베르 크라에', d1: '벨기에 대대장으로 임진강 전투에서 심한 부상을 입을 때까지 최전선에서 부대를 지휘했습니다.', f2: '조르주 비에르브', d2: '부상당한 크라에 대대장의 뒤를 이어 잣골 전투에서 성공적으로 방어전을 이끌었습니다.' },
-            '룩셈부르크': { bg: '인구 30만 명의 작은 나라였지만 벨기에 대대에 소대 규모로 통합 배속되어 누구보다 용맹하게 싸웠습니다.', f1: '조제프 바그너', d1: '룩셈부르크 소대장으로 배속되어 여러 고지전에서 헌신적인 리더십을 발휘했습니다.', f2: '루디 부르그', d2: '정찰 및 전초전 임무에서 여러 차례 적의 공격을 막아낸 용감한 소대원입니다.' },
-            '에티오피아': { bg: '황실 근위대인 ‘각뉴(Kagnew) 부대’가 참전해 253차례의 전투에서 단 한 명의 포로도 남기지 않은 신화를 썼습니다.', f1: '아만 안돔', d1: '대대장으로서 부대원들을 이끌며 강원도 산악 지형의 불리함을 딛고 무패 신화를 창조했습니다.', f2: '물루게타 불리', d2: '에티오피아 파병 사령관으로서 군기 확립과 부대 전술을 훌륭히 이끌었습니다.' },
-            '콜롬비아': { bg: '중남미 유일의 전투 부대 파병국으로, 올드발디 고지 전투와 금성 전투에서 용맹을 떨쳤습니다.', f1: '알베르토 루이스 노보아', d1: '콜롬비아 대대장으로서 낯선 기후와 지형 속에서도 훌륭하게 부대원들을 지휘했습니다.', f2: '하이메 폴라니아 푸요', d2: '올드발디 고지 방어전에서 중상을 입고도 끝까지 진지를 사수하여 국민적 영웅이 되었습니다.' },
-            '스웨덴': { bg: '가장 먼저 의료 지원을 결정하여 부산에 스웨덴 적십자 야전병원을 세워 수만 명의 군인과 민간인을 치료했습니다.', f1: '칼 에릭 그로트', d1: '적십자 병원장으로서 부족한 물자 속에서도 체계적인 병원 운영과 수술을 이끌었습니다.', f2: '잉그리드 욘손', d2: '전쟁의 참상 속에서도 환자들에게 따뜻한 위로와 헌신적인 의료 지원을 아끼지 않은 간호사입니다.' },
-            '인도': { bg: '제60공수야전병원대를 파견하여 최전선과 공수작전 지역까지 투입되어 부상병의 생명을 구했습니다.', f1: 'A.G. 랑가라지', d1: '병원대장으로서 직접 낙하산을 타고 작전 지역에 투입되어 부상병을 수술하는 헌신을 보여주었습니다.', f2: 'N.B. 바네르지', d2: '포탄이 떨어지는 최전방 야전 텐트 속에서도 밤낮없이 외과 수술을 집도한 군의관입니다.' },
-            '덴마크': { bg: '최첨단 의료 장비를 갖춘 병원선 ‘유틀란디아(Jutlandia)호’를 파견하여 해상 종합병원 역할을 완벽히 수행했습니다.', f1: '카이 하메리크', d1: '유틀란디아호의 원장으로 군인뿐만 아니라 한국의 민간인과 고아들까지 헌신적으로 치료했습니다.', f2: '안나 크리스텐센', d2: '병원선의 수석 간호사로서 낯선 이국땅에서 환자들의 회복을 위해 평화의 천사 역할을 했습니다.' },
-            '노르웨이': { bg: '육군 이동외과병원(NORMASH)을 설립하여 최전방인 동두천 인근에서 9만 명 이상의 환자를 치료했습니다.', f1: '베른하르드 파우스', d1: '수석 외과의사로서 하루 수십 건의 긴급 수술을 집도하며 수많은 참전용사의 생명을 구했습니다.', f2: '브리트 루네스', d2: '이동외과병원의 열악한 환경 속에서도 묵묵히 부상병들의 치료와 간호를 전담했습니다.' },
-            '이탈리아': { bg: '제68적십자야전병원을 서울 영등포에 파견하여 군인과 민간인을 가리지 않고 숭고한 의료 지원을 펼쳤습니다.', f1: '루이지 토리노', d1: '이탈리아 의료진을 이끄는 병원장으로서 화재나 전염병 등 여러 악조건 속에서도 병원을 지켰습니다.', f2: '마리아 로만', d2: '전쟁 고아들과 민간인 부상자들을 따뜻하게 품어준 헌신적인 적십자 소속 간호사입니다.' },
-            '독일': { bg: '2018년에 22번째 참전국으로 공식 인정되었으며, 종전 후 부산에 적십자 병원을 운영하며 의료 재건을 도왔습니다.', f1: '귄터 휘버', d1: '서독 의료진 파견단의 대표로서 전후 열악했던 한국의 의료 체계가 자리 잡을 수 있도록 힘썼습니다.', f2: '칼 하인츠', d2: '부산 서독병원에서 오랜 기간 헌신하며 수많은 한국 민간인 환자들을 수술하고 치료했습니다.' }
-        };
-
-        let firstCard = null, secondCard = null;
-        let lockBoard = false, matchedPairs = 0;
-        let startTime, timerInterval, elapsedMs = 0;
-        let currentUser = { name: '', dept: '', studentId: '' };
-        let currentSelectedNations = [];
-        const targetPairs = 10;
-
-        window.showScreen = (screenId) => {
-            document.querySelectorAll('#app > div[id^="screen-"]').forEach(el => el.classList.add('hidden'));
-            document.getElementById(screenId).classList.remove('hidden');
-            document.getElementById(screenId).classList.add('flex');
-        };
-
-        function formatTime(ms) {
-            const totalSeconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
-            const milliseconds = Math.floor((ms % 1000) / 10);
-            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(2, '0')}`;
-        }
-
-        window.startGame = () => {
-            const name = document.getElementById('input-name').value.trim();
-            const dept = document.getElementById('input-dept').value.trim();
-            const sid = document.getElementById('input-student-id').value.trim();
-
-            if (!name || !dept || !sid) {
-                document.getElementById('form-error').classList.remove('hidden');
-                return;
-            }
-
-            currentUser = { name, dept, studentId: sid };
-            document.getElementById('display-user-info').innerText = `${name} (${dept} / ${sid})`;
-            
-            initGame();
-            window.showScreen('screen-game');
-            
-            elapsedMs = 0;
-            startTime = Date.now();
-            document.getElementById('timer-display').innerText = "00:00.00";
-            timerInterval = setInterval(() => {
-                elapsedMs = Date.now() - startTime;
-                document.getElementById('timer-display').innerText = formatTime(elapsedMs);
-            }, 33);
-        };
-
-        window.quitGame = () => {
-            clearInterval(timerInterval);
-            window.showScreen('screen-main');
-        };
-
-        function initGame() {
-            const board = document.getElementById('game-board');
-            board.innerHTML = '';
-            matchedPairs = 0;
-            [firstCard, secondCard, lockBoard] = [null, null, false];
-
-            let shuffledNations = [...nations].sort(() => 0.5 - Math.random());
-            currentSelectedNations = shuffledNations.slice(0, targetPairs);
-
-            let deck = [...currentSelectedNations, ...currentSelectedNations].sort(() => 0.5 - Math.random());
-
-            deck.forEach((nation) => {
-                const cardEl = document.createElement('div');
-                cardEl.classList.add('card', 'perspective', 'cursor-pointer', 'w-full', 'h-full', 'min-h-[70px]', 'md:min-h-[90px]');
-                cardEl.dataset.name = nation.name;
-
-                cardEl.innerHTML = `
-                    <div class="card-inner">
-                        <div class="card-front"></div>
-                        <div class="card-back">
-                            <span class="text-4xl leading-none mb-1">${nation.flag}</span>
-                            <span class="text-xs md:text-sm font-bold text-gray-800 text-center leading-tight tracking-tighter w-full px-1 truncate">${nation.name}</span>
-                        </div>
-                    </div>
-                `;
-
-                cardEl.addEventListener('click', () => {
-                    if (lockBoard || cardEl === firstCard || cardEl.classList.contains('matched')) return;
-                    cardEl.classList.add('flipped');
-                    
-                    if (!firstCard) {
-                        firstCard = cardEl;
-                        return;
-                    }
-                    
-                    secondCard = cardEl;
-                    lockBoard = true;
-                    
-                    if (firstCard.dataset.name === secondCard.dataset.name) {
-                        firstCard.classList.add('matched');
-                        secondCard.classList.add('matched');
-                        matchedPairs++;
-                        [firstCard, secondCard, lockBoard] = [null, null, false];
-                        
-                        if (matchedPairs === targetPairs) {
-                            setTimeout(gameComplete, 500);
-                        }
-                    } else {
-                        setTimeout(() => {
-                            firstCard.classList.remove('flipped');
-                            secondCard.classList.remove('flipped');
-                            [firstCard, secondCard, lockBoard] = [null, null, false];
-                        }, 800);
-                    }
-                });
-                board.appendChild(cardEl);
-            });
-        }
-
-        async function gameComplete() {
-            clearInterval(timerInterval);
-            const finalTimeStr = formatTime(elapsedMs);
-            
-            // 역사 정보 렌더링
-            const randomNation = currentSelectedNations[Math.floor(Math.random() * currentSelectedNations.length)];
-            const history = historyData[randomNation.name];
-            
-            if(history) {
-                document.getElementById('history-nation-name').innerHTML = `${randomNation.flag} ${randomNation.name}의 한국전쟁 참전 이야기`;
-                document.getElementById('history-background').innerText = history.bg;
-                document.getElementById('history-fig1-name').innerText = history.f1;
-                document.getElementById('history-fig1-desc').innerText = history.d1;
-                document.getElementById('history-fig2-name').innerText = history.f2;
-                document.getElementById('history-fig2-desc').innerText = history.d2;
-            }
-            
-            document.getElementById('modal-time').innerText = finalTimeStr;
-            const modal = document.getElementById('modal-clear');
-            const modalContent = document.getElementById('modal-clear-content');
-            
-            modal.classList.remove('hidden');
-            void modal.offsetWidth; 
-            modal.classList.remove('opacity-0');
-            modalContent.classList.remove('scale-95');
-
-            try {
-                await addDoc(collection(db, 'rankings'), {
-                    name: currentUser.name,
-                    department: currentUser.dept,
-                    studentId: currentUser.studentId,
-                    time: elapsedMs,
-                    formattedTime: finalTimeStr,
-                    timestamp: serverTimestamp()
-                });
-            } catch (e) {
-                console.error("저장 실패:", e);
-            }
-        }
-
-        window.closeClearModal = () => {
-            const modal = document.getElementById('modal-clear');
-            modal.classList.add('opacity-0');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                window.showScreen('screen-main');
-            }, 300);
-        };
-
-        window.showRankingScreen = async () => {
-            window.showScreen('screen-ranking');
-            const tbody = document.getElementById('ranking-list');
-            document.getElementById('loading-overlay').classList.remove('hidden');
-            tbody.innerHTML = '';
-
-            try {
-                const querySnapshot = await getDocs(collection(db, 'rankings'));
-                let records = [];
-                querySnapshot.forEach((doc) => records.push(doc.data()));
-                records.sort((a, b) => a.time - b.time);
-
-                if (records.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">아직 등록된 기록이 없습니다.</td></tr>`;
-                } else {
-                    records.slice(0, 50).forEach((record, index) => {
-                        const tr = document.createElement('tr');
-                        tr.className = index < 3 ? 'bg-blue-50 border-b' : 'bg-white border-b';
-                        
-                        let rankDisplay = `${index + 1}`;
-                        if (index === 0) rankDisplay = '🥇 1';
-                        if (index === 1) rankDisplay = '🥈 2';
-                        if (index === 2) rankDisplay = '🥉 3';
-
-                        tr.innerHTML = `
-                            <td class="px-4 py-3 text-center font-bold text-gray-700">${rankDisplay}</td>
-                            <td class="px-4 py-3 font-medium text-gray-900">${record.name} / ${record.department} / ${record.studentId}</td>
-                            <td class="px-4 py-3 text-right font-mono text-unblue font-bold">${record.formattedTime}</td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                }
-            } catch (error) {
-                console.error("랭킹 불러오기 실패:", error);
-                tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-8 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</td></tr>`;
-            } finally {
-                document.getElementById('loading-overlay').classList.add('hidden');
-            }
-        };
-    </script>
-</body>
-</html>
+  );
+}
