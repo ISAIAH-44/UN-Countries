@@ -304,13 +304,16 @@
         <div>
           <label class="block text-xs font-bold text-slate-300 mb-1.5">학과 선택 <span class="text-rose-400">*</span></label>
           <select id="select-dept" onchange="handleDeptChange()" class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
-            <option value="스마트전기과">스마트전기과</option>
-            <option value="바이오의약과">바이오의약과</option>
-            <option value="화학공학과">화학공학과</option>
-            <option value="기계설계과">기계설계과</option>
-            <option value="전기전자과">전기전자과</option>
-            <option value="소방안전과">소방안전과</option>
-            <option value="사물인터넷과">사물인터넷(IoT)과</option>
+            <option value="화공">화공</option>
+            <option value="로봇">로봇</option>
+            <option value="소방">소방</option>
+            <option value="전자">전자</option>
+            <option value="환경">환경</option>
+            <option value="사물">사물</option>
+            <option value="콘텐츠">콘텐츠</option>
+            <option value="경찰">경찰</option>
+            <option value="레저">레저</option>
+            <option value="반도체">반도체</option>
             <option value="DIRECT">직접 입력</option>
           </select>
           <input id="input-custom-dept" type="text" placeholder="학과명을 직접 입력하세요" class="hidden mt-2 w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500">
@@ -950,11 +953,13 @@
     }
 
     const DEMO_RANKINGS = [
-      { id: '1', name: '김태윤', department: '스마트전기과', studentId: '20104', timeMs: 42350, timeFormatted: '00:42.350', moves: 14, date: '09.28 20:45' },
-      { id: '2', name: '이지민', department: '바이오의약과', studentId: '10312', timeMs: 48920, timeFormatted: '00:48.920', moves: 16, date: '09.28 18:30' },
-      { id: '3', name: '박도현', department: '기계설계과', studentId: '30208', timeMs: 53180, timeFormatted: '00:53.180', moves: 18, date: '09.28 11:20' },
-      { id: '4', name: '최수아', department: '화학공학과', studentId: '20415', timeMs: 59410, timeFormatted: '00:59.410', moves: 20, date: '09.27 15:10' },
-      { id: '5', name: '정현우', department: '전기전자과', studentId: '10521', timeMs: 64700, timeFormatted: '01:04.700', moves: 22, date: '09.27 09:40' }
+      { id: '1', name: '김태윤', department: '화공', studentId: '20104', timeMs: 42350, timeFormatted: '00:42.350', moves: 14, date: '09.28 20:45' },
+      { id: '2', name: '이지민', department: '반도체', studentId: '10312', timeMs: 48920, timeFormatted: '00:48.920', moves: 16, date: '09.28 18:30' },
+      { id: '3', name: '박도현', department: '로봇', studentId: '30208', timeMs: 53180, timeFormatted: '00:53.180', moves: 18, date: '09.28 11:20' },
+      { id: '4', name: '최수아', department: '소방', studentId: '20415', timeMs: 59410, timeFormatted: '00:59.410', moves: 20, date: '09.27 15:10' },
+      { id: '5', name: '정현우', department: '전자', studentId: '10521', timeMs: 64700, timeFormatted: '01:04.700', moves: 22, date: '09.27 09:40' },
+      { id: '6', name: '강민준', department: '사물', studentId: '20603', timeMs: 68120, timeFormatted: '01:08.120', moves: 24, date: '09.27 08:30' },
+      { id: '7', name: '윤채원', department: '콘텐츠', studentId: '10719', timeMs: 72450, timeFormatted: '01:12.450', moves: 25, date: '09.26 19:15' }
     ];
 
     function getRankings() {
