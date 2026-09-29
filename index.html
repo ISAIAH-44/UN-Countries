@@ -406,8 +406,8 @@
           <div>
             <div class="flex items-center gap-2">
               <h3 class="text-xl sm:text-2xl font-black">명예의 전당 (글로벌 랭킹)</h3>
-              <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                실시간 랭킹 순위
+              <span class="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold flex items-center gap-1">
+                ⚡ 상위 20위 고속 로딩
               </span>
             </div>
             <p class="text-xs text-sky-200 mt-0.5">
@@ -418,7 +418,7 @@
         <button onclick="closeLeaderboardModal()" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors">✕</button>
       </div>
 
-      <!-- Filters -->
+      <!-- Filters & Limit Toggle -->
       <div class="p-4 bg-slate-800/80 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div class="flex flex-1 items-center gap-2 min-w-[200px]">
           <input id="leaderboard-search" oninput="renderLeaderboardTable()" type="text" placeholder="이름, 학번, 학과 검색..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-400">
@@ -428,6 +428,9 @@
           <select id="leaderboard-dept-filter" onchange="renderLeaderboardTable()" class="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-sky-400">
             <option value="ALL">전체 학과</option>
           </select>
+          <button id="leaderboard-limit-toggle-btn" onclick="toggleLeaderboardLimit()" class="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold border border-slate-600 transition-colors">
+            전체 보기
+          </button>
         </div>
       </div>
 
@@ -451,9 +454,13 @@
             </tbody>
           </table>
         </div>
+        <div id="leaderboard-more-container" class="mt-4 text-center">
+          <!-- Load more or count indicator rendered by JS -->
+        </div>
       </div>
 
-      <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end">
+      <div class="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <span id="leaderboard-footer-count">상위 20위 기록 로드됨</span>
         <button onclick="closeLeaderboardModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs">
           닫기
         </button>
@@ -962,23 +969,30 @@
       { id: '7', name: '윤채원', department: '콘텐츠', studentId: '10719', timeMs: 72450, timeFormatted: '01:12.450', moves: 25, date: '09.26 19:15' }
     ];
 
+    let cachedRankings = null;
+
     function getRankings() {
+      if (cachedRankings) return cachedRankings;
       try {
         const raw = localStorage.getItem('samil_rankings');
         if (!raw) {
           localStorage.setItem('samil_rankings', JSON.stringify(DEMO_RANKINGS));
+          cachedRankings = DEMO_RANKINGS;
           return DEMO_RANKINGS;
         }
-        return JSON.parse(raw).sort((a,b) => a.timeMs - b.timeMs);
+        cachedRankings = JSON.parse(raw).sort((a,b) => a.timeMs - b.timeMs);
+        return cachedRankings;
       } catch(e) {
+        cachedRankings = DEMO_RANKINGS;
         return DEMO_RANKINGS;
       }
     }
 
     function saveNewRanking(record) {
-      const list = getRankings();
+      const list = getRankings().slice();
       list.push(record);
       list.sort((a,b) => a.timeMs - b.timeMs);
+      cachedRankings = list;
       localStorage.setItem('samil_rankings', JSON.stringify(list));
     }
 
@@ -1398,13 +1412,41 @@
     }
 
     // --- 8. LEADERBOARD MODAL ---
+    let leaderboardLimit = 20;
+
     function openLeaderboardModal() {
+      leaderboardLimit = 20;
+      updateLimitToggleBtn();
       populateDeptFilter();
       renderLeaderboardTable();
       document.getElementById('modal-leaderboard').classList.remove('hidden');
     }
+
     function closeLeaderboardModal() {
       document.getElementById('modal-leaderboard').classList.add('hidden');
+    }
+
+    function toggleLeaderboardLimit() {
+      const records = getRankings();
+      if (leaderboardLimit === 20) {
+        leaderboardLimit = records.length || 1000;
+      } else {
+        leaderboardLimit = 20;
+      }
+      updateLimitToggleBtn();
+      renderLeaderboardTable();
+    }
+
+    function updateLimitToggleBtn() {
+      const btn = document.getElementById('leaderboard-limit-toggle-btn');
+      if (!btn) return;
+      if (leaderboardLimit === 20) {
+        btn.textContent = '전체 순위 보기';
+        btn.className = 'px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold border border-slate-600 transition-colors';
+      } else {
+        btn.textContent = '상위 20위만 보기';
+        btn.className = 'px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold border border-sky-400 transition-colors shadow-md';
+      }
     }
 
     function populateDeptFilter() {
@@ -1419,6 +1461,8 @@
       const deptFilter = document.getElementById('leaderboard-dept-filter').value;
       const records = getRankings();
       const tbody = document.getElementById('leaderboard-tbody');
+      const moreContainer = document.getElementById('leaderboard-more-container');
+      const footerCount = document.getElementById('leaderboard-footer-count');
 
       const filtered = records.filter(r => {
         const matchSearch = r.name.toLowerCase().includes(query) || r.studentId.includes(query) || r.department.toLowerCase().includes(query);
@@ -1427,16 +1471,21 @@
       });
 
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400">등록된 랭킹 기록이 없습니다.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-10 text-slate-400 font-medium">등록된 랭킹 기록이 없습니다.</td></tr>`;
+        if (moreContainer) moreContainer.innerHTML = '';
+        if (footerCount) footerCount.textContent = '0개 기록';
         return;
       }
 
-      tbody.innerHTML = filtered.map((rec, idx) => {
+      // Slice to top 20 or current limit
+      const displayList = filtered.slice(0, leaderboardLimit);
+
+      tbody.innerHTML = displayList.map((rec, idx) => {
         const rank = idx + 1;
         let badge = `<span class="font-bold text-slate-400 w-6 text-center inline-block">${rank}</span>`;
-        if (rank === 1) badge = `<span class="w-6 h-6 rounded-full bg-amber-400 text-slate-900 font-black text-xs inline-flex items-center justify-center">🥇 1</span>`;
-        else if (rank === 2) badge = `<span class="w-6 h-6 rounded-full bg-slate-300 text-slate-900 font-black text-xs inline-flex items-center justify-center">🥈 2</span>`;
-        else if (rank === 3) badge = `<span class="w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs inline-flex items-center justify-center">🥉 3</span>`;
+        if (rank === 1) badge = `<span class="w-6 h-6 rounded-full bg-amber-400 text-slate-900 font-black text-xs inline-flex items-center justify-center shadow-sm">🥇 1</span>`;
+        else if (rank === 2) badge = `<span class="w-6 h-6 rounded-full bg-slate-300 text-slate-900 font-black text-xs inline-flex items-center justify-center shadow-sm">🥈 2</span>`;
+        else if (rank === 3) badge = `<span class="w-6 h-6 rounded-full bg-amber-700 text-white font-black text-xs inline-flex items-center justify-center shadow-sm">🥉 3</span>`;
 
         const isMe = gameState.lastRecord && gameState.lastRecord.id === rec.id;
 
@@ -1452,6 +1501,24 @@
           </tr>
         `;
       }).join('');
+
+      // Show more button if filtered has more than 20
+      if (filtered.length > displayList.length) {
+        const remaining = filtered.length - displayList.length;
+        if (moreContainer) {
+          moreContainer.innerHTML = `
+            <button onclick="toggleLeaderboardLimit()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-300 text-xs font-bold transition-all shadow hover:scale-105">
+              전체 ${filtered.length}위까지 모두 보기 (남은 ${remaining}개 더 불러오기) ↓
+            </button>
+          `;
+        }
+      } else {
+        if (moreContainer) moreContainer.innerHTML = '';
+      }
+
+      if (footerCount) {
+        footerCount.textContent = `총 ${filtered.length}명 중 상위 ${displayList.length}위 표시 중`;
+      }
     }
 
     // --- 9. ARCHIVE ENCYCLOPEDIA MODAL ---
